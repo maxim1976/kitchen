@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html x-data="menuApp()" :lang="lang === 'en' ? 'en' : 'zh-TW'">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hualien Kitchen &mdash; Menu</title>{# TODO: {{ restaurant_name }} #}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    [x-cloak] { display: none !important; }
+    .table-display { padding: 0.45rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; font-weight: 700; color: var(--green); background: var(--green-pale); letter-spacing: 0.02em; }
+    .confirm-table-badge { display: inline-block; font-size: 0.8rem; font-weight: 700; padding: 0.2rem 0.7rem; border-radius: 4px; background: var(--green-pale); color: var(--green); margin-left: 0.4rem; }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════
+       MENU VIEW
+  ══════════════════════════════════════════ -->
+  <div x-show="view === 'menu'">
+
+    <!-- ── Header ── -->
+    <header class="site-header">
+      <div class="header-inner">
+        <div class="brand">
+          <span class="brand-name">Hualien Kitchen</span>{# TODO: {{ restaurant_name }} #}
+          <span class="brand-tagline" x-text="t.tagline"></span>{# TODO: {{ tagline }} #}
+        </div>
+        <div class="lang-toggle" role="group" aria-label="Language">
+          <button class="lang-btn" :class="{ active: lang === 'en' }" @click="lang = 'en'">EN</button>
+          <button class="lang-btn" :class="{ active: lang === 'zh' }" @click="lang = 'zh'">中</button>
+        </div>
+        <button class="cart-toggle" @click="cartOpen = true" :aria-label="t.yourOrder">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <span x-cloak x-show="cartCount > 0" class="cart-badge" x-text="cartCount"></span>
+          <span class="cart-label" x-text="t.order"></span>
+          <span x-cloak x-show="cartCount > 0" class="cart-total-pill">NT$<span x-text="cartTotal"></span></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── Main Layout ── -->
+    <div class="layout">
+
+      <!-- ── Menu Section ── -->
+      <main class="menu-section">
+        <nav class="category-nav" :aria-label="t.categories.nav">
+          <button class="category-btn" :class="{ active: activeCategory === 'all' }" @click="activeCategory = 'all'" x-text="t.all"></button>
+          <template x-for="cat in categories" :key="cat.id">
+            <button
+              class="category-btn"
+              :class="{ active: activeCategory === cat.id }"
+              @click="activeCategory = cat.id"
+              x-text="t.categories[cat.id]">
+            </button>
+          </template>
+        </nav>
+
+        <div class="menu-grid">
+          <template x-for="item in filteredItems" :key="item.id">
+            <article class="menu-card">
+              <div class="card-body">
+                <div class="card-info">
+                  <h3 class="item-name"     x-text="lang === 'en' ? item.name   : item.nameZh"></h3>
+                  <p  class="item-name-sub" x-text="lang === 'en' ? item.nameZh : item.name"></p>
+                  <p  class="item-desc"     x-text="lang === 'en' ? item.desc   : item.descZh"></p>
+                  <span class="item-price">NT$<span x-text="item.price"></span></span>
+                </div>
+                <div class="card-actions">
+                  <div class="qty-control" x-show="getQty(item.id) > 0">
+                    <button class="qty-btn" @click="removeFromCart(item)" :aria-label="t.removeOne">&#8722;</button>
+                    <span class="qty-display" x-text="getQty(item.id)"></span>
+                    <button class="qty-btn" @click="addToCart(item)"    :aria-label="t.addOne">&#43;</button>
+                  </div>
+                  <button class="add-btn" x-show="getQty(item.id) === 0" @click="addToCart(item)" x-text="t.add"></button>
+                </div>
+              </div>
+            </article>
+          </template>
+        </div>
+      </main>
+
+      <!-- ── Cart Sidebar ── -->
+      <aside class="cart-sidebar" :class="{ open: cartOpen }" :aria-label="t.yourOrder">
+
+        <div class="cart-header">
+          <h2 x-text="t.yourOrder"></h2>
+          <button class="cart-close" @click="cartOpen = false" :aria-label="t.close">&#10005;</button>
+        </div>
+
+        <!-- Empty state -->
+        <div class="cart-empty" x-show="cart.length === 0">
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+          <p x-text="t.noItemsYet"></p>
+          <p class="cart-empty-sub" x-text="t.addFromMenu"></p>
+        </div>
+
+        <!-- Scrollable: items + order form -->
+        <div class="cart-scroll" x-show="cart.length > 0">
+          <ul class="cart-items">
+            <template x-for="item in cart" :key="item.id">
+              <li class="cart-item">
+                <div class="cart-item-info">
+                  <span class="cart-item-name" x-text="lang === 'en' ? item.name : item.nameZh"></span>
+                  <span class="cart-item-price">NT$<span x-text="item.price * item.qty"></span></span>
+                </div>
+                <div class="qty-control small">
+                  <button class="qty-btn" @click="removeFromCart(item)" :aria-label="t.removeOne">&#8722;</button>
+                  <span class="qty-display" x-text="item.qty"></span>
+                  <button class="qty-btn" @click="addToCart(item)"    :aria-label="t.addOne">&#43;</button>
+                </div>
+              </li>
+            </template>
+          </ul>
+
+          <!-- Order Details Form -->
+          <div class="order-form">
+
+            <!-- Name -->
+            <div class="form-field">
+              <label class="form-label" x-text="t.yourName"></label>
+              <input
+                class="form-input"
+                :class="{ 'has-error': nameError }"
+                type="text"
+                x-model="customerName"
+                :placeholder="t.namePlaceholder"
+                @input="nameError = false"
+                autocomplete="given-name">
+              <span class="field-error" x-show="nameError" x-text="t.nameRequired"></span>
+            </div>
+
+            <!-- Table number (auto-filled from QR code URL) -->
+            <div class="form-field" x-show="tableNumber && orderType === 'dine-in'" x-cloak>
+              <label class="form-label" x-text="lang === 'en' ? 'Table' : '桌號'"></label>
+              <div class="table-display" x-text="tableNumber"></div>
+            </div>
+
+            <!-- Dine In / Takeout -->
+            <div class="form-field">
+              <label class="form-label" x-text="t.orderType"></label>
+              <div class="type-toggle">
+                <button class="type-btn" :class="{ active: orderType === 'dine-in' }" @click="orderType = 'dine-in'" x-text="t.dineIn"></button>
+                <button class="type-btn" :class="{ active: orderType === 'takeout' }" @click="orderType = 'takeout'" x-text="t.takeout"></button>
+              </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-field">
+              <label class="form-label" x-text="t.orderNotes"></label>
+              <textarea
+                class="form-input form-textarea"
+                x-model="orderNotes"
+                :placeholder="t.notesPlaceholder"
+                rows="2">
+              </textarea>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Cart Footer -->
+        <div class="cart-footer" x-show="cart.length > 0">
+          <div class="cart-divider"></div>
+          <div class="cart-total">
+            <span x-text="t.total"></span>
+            <strong>NT$<span x-text="cartTotal"></span></strong>
+          </div>
+          <button class="order-btn" @click="placeOrder()" :disabled="submitting" x-text="submitting ? '...' : t.placeOrder"></button>
+          <button class="clear-btn"  @click="clearCart()"  x-text="t.clearOrder"></button>
+        </div>
+
+      </aside>
+    </div>
+
+    <!-- Overlay (mobile) -->
+    <div class="cart-overlay" x-cloak x-show="cartOpen" @click="cartOpen = false"></div>
+
+    <!-- Mobile Cart Bar -->
+    <div class="mobile-cart-bar" x-cloak x-show="cartCount > 0 && !cartOpen" @click="cartOpen = true">
+      <span class="mobile-cart-count"><strong x-text="cartCount"></strong> <span x-text="t.items"></span></span>
+      <span class="mobile-cart-cta" x-text="t.viewOrder"></span>
+      <strong class="mobile-cart-total">NT$<span x-text="cartTotal"></span></strong>
+    </div>
+
+  </div><!-- end menu view -->
+
+
+  <!-- ══════════════════════════════════════════
+       CONFIRMATION VIEW
+  ══════════════════════════════════════════ -->
+  <div class="confirmation-view" x-cloak x-show="view === 'confirmation'">
+    <div class="confirm-card" x-show="confirmedOrder">
+
+      <div class="confirm-check-circle">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+
+      <h2 class="confirm-title" x-text="t.orderConfirmed"></h2>
+
+      <div class="confirm-number-block">
+        <span class="confirm-number-label" x-text="t.orderNumber"></span>
+        <span class="confirm-number" x-text="'#' + confirmedOrder?.number"></span>
+      </div>
+
+      <div class="confirm-meta">
+        <span class="confirm-customer" x-text="confirmedOrder?.name"></span>
+        <span class="confirm-type-badge" :class="confirmedOrder?.type" x-text="confirmedOrder?.type === 'dine-in' ? t.dineIn : t.takeout"></span>
+        <span class="confirm-table-badge" x-cloak x-show="confirmedOrder?.table && confirmedOrder?.type === 'dine-in'" x-text="(lang === 'en' ? 'Table ' : '桌號 ') + confirmedOrder?.table"></span>
+      </div>
+
+      <ul class="confirm-items">
+        <template x-for="item in confirmedOrder?.items" :key="item.id">
+          <li class="confirm-item">
+            <span x-text="(lang === 'en' ? item.name : item.nameZh) + ' \xd7' + item.qty"></span>
+            <span>NT$<span x-text="item.price * item.qty"></span></span>
+          </li>
+        </template>
+      </ul>
+
+      <div class="confirm-notes" x-show="confirmedOrder?.notes">
+        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        <span x-text="confirmedOrder?.notes"></span>
+      </div>
+
+      <div class="confirm-total">
+        <span x-text="t.total"></span>
+        <strong>NT$<span x-text="confirmedOrder?.total"></span></strong>
+      </div>
+
+      <div class="confirm-wait">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span x-text="t.estimatedWait + ': ~' + estimatedWait + ' ' + t.minutes"></span>
+      </div>
+
+      <button class="order-btn confirm-new-btn" @click="newOrder()" x-text="t.newOrder"></button>
+    </div>
+  </div>
+
+
+  <script>
+    // Items injected by Flask — same shape as the static prototype
+    const MENU_ITEMS = {{ items | tojson }};  {# TODO: served from DB #}
+
+    function menuApp() {
+      return {
+        // ── View state ──
+        lang:           'en',         {# TODO: set from Accept-Language or session #}
+        view:           'menu',
+        activeCategory: 'all',
+        cartOpen:       false,
+        submitting:     false,
+
+        // ── Order form ──
+        cart:         [],
+        customerName: '',
+        orderType:    'dine-in',
+        orderNotes:   '',
+        tableNumber:  {{ table_number | tojson }},
+        nameError:    false,
+
+        // ── Confirmation ──
+        confirmedOrder: null,
+        estimatedWait:  {{ estimated_wait }},  {# from config.ESTIMATED_WAIT #}
+
+        // ── Data ──
+        items: MENU_ITEMS,
+
+        translations: {
+          en: {
+            tagline:      'Authentic Taiwanese Cuisine',
+            order:        'Order',
+            all:          'All',
+            categories:   { nav: 'Menu categories', appetizers: 'Appetizers', mains: 'Main Dishes', soups: 'Soups', drinks: 'Drinks' },
+            add:          'Add',
+            addOne:       'Add one',
+            removeOne:    'Remove one',
+            yourOrder:    'Your Order',
+            close:        'Close',
+            noItemsYet:   'No items yet',
+            addFromMenu:  'Add something from the menu',
+            yourName:     'Your Name',
+            namePlaceholder: 'e.g. Alex',
+            nameRequired: 'Please enter your name',
+            orderType:    'Order Type',
+            dineIn:       'Dine In',
+            takeout:      'Takeout',
+            orderNotes:   'Notes',
+            notesPlaceholder: 'Allergies, special requests\u2026 (optional)',
+            total:        'Total',
+            placeOrder:   'Place Order',
+            clearOrder:   'Clear order',
+            items:        'items',
+            viewOrder:    'View Order \u203a',
+            orderConfirmed: 'Order Confirmed!',
+            orderNumber:  'Order',
+            estimatedWait:'Est. wait',
+            minutes:      'min',
+            newOrder:     'Place New Order',
+          },
+          zh: {
+            tagline:      '\u9053\u5730\u53f0\u7063\u6599\u7406',
+            order:        '\u8a02\u55ae',
+            all:          '\u5168\u90e8',
+            categories:   { nav: '\u83dc\u55ae\u5206\u985e', appetizers: '\u958b\u80c3\u83dc', mains: '\u4e3b\u98df', soups: '\u6e6f\u54c1', drinks: '\u98f2\u6599' },
+            add:          '\u52a0\u5165',
+            addOne:       '\u589e\u52a0\u4e00\u4efd',
+            removeOne:    '\u6e1b\u5c11\u4e00\u4efd',
+            yourOrder:    '\u60a8\u7684\u8a02\u55ae',
+            close:        '\u95dc\u9589',
+            noItemsYet:   '\u5c1a\u7121\u9910\u9ede',
+            addFromMenu:  '請從菜單加點項目',
+            yourName:     '\u60a8\u7684\u59d3\u540d',
+            namePlaceholder: '\u4f8b\uff1a\u5c0f\u660e',
+            nameRequired: '\u8acb\u8f38\u5165\u59d3\u540d',
+            orderType:    '\u7528\u9910\u65b9\u5f0f',
+            dineIn:       '\u5167\u7528',
+            takeout:      '\u5916\u5e36',
+            orderNotes:   '\u5099\u8a3b',
+            notesPlaceholder: '\u904e\u654f\u3001\u7279\u6b8a\u8981\u6c42\u22ef\uff08\u53ef\u4e0d\u586b\uff09',
+            total:        '\u7e3d\u8a08',
+            placeOrder:   '\u9001\u51fa\u8a02\u55ae',
+            clearOrder:   '\u6e05\u7a7a\u8a02\u55ae',
+            items:        '\u9805',
+            viewOrder:    '\u67e5\u770b\u8a02\u55ae \u203a',
+            orderConfirmed: '\u8a02\u55ae\u5df2\u6210\u7acb\uff01',
+            orderNumber:  '\u55ae\u865f',
+            estimatedWait:'\u9810\u8a08\u7b49\u5019',
+            minutes:      '\u5206\u9418',
+            newOrder:     '\u65b0\u8a02\u55ae',
+          },
+        },
+
+        get t() { return this.translations[this.lang]; },
+
+        categories: [
+          { id: 'appetizers' },
+          { id: 'mains'      },
+          { id: 'soups'      },
+          { id: 'drinks'     },
+        ],
+
+        get filteredItems() {
+          if (this.activeCategory === 'all') return this.items;
+          return this.items.filter(i => i.category === this.activeCategory);
+        },
+        get cartTotal() {
+          return this.cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+        },
+        get cartCount() {
+          return this.cart.reduce((sum, i) => sum + i.qty, 0);
+        },
+
+        addToCart(item) {
+          const existing = this.cart.find(i => i.id === item.id);
+          if (existing) { existing.qty++; }
+          else { this.cart.push({ ...item, qty: 1 }); }
+        },
+        removeFromCart(item) {
+          const existing = this.cart.find(i => i.id === item.id);
+          if (!existing) return;
+          if (existing.qty > 1) { existing.qty--; }
+          else { this.cart = this.cart.filter(i => i.id !== item.id); }
+        },
+        getQty(itemId) {
+          const item = this.cart.find(i => i.id === itemId);
+          return item ? item.qty : 0;
+        },
+        clearCart() {
+          this.cart = [];
+        },
+
+        async placeOrder() {
+          if (!this.customerName.trim()) {
+            this.nameError = true;
+            return;
+          }
+          this.submitting = true;
+          try {
+            const res = await fetch('/order', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name:  this.customerName.trim(),
+                type:  this.orderType,
+                notes: this.orderNotes.trim(),
+                table: this.tableNumber,
+                total: this.cartTotal,
+                items: this.cart.map(i => ({
+                  id:     i.id,
+                  name:   i.name,
+                  nameZh: i.nameZh,
+                  price:  i.price,
+                  qty:    i.qty,
+                })),
+              }),
+            });
+            const data = await res.json();
+            if (data.success) {
+              this.confirmedOrder = {
+                number: data.orderNumber,
+                name:   this.customerName.trim(),
+                type:   this.orderType,
+                notes:  this.orderNotes.trim(),
+                table:  this.tableNumber,
+                items:  [...this.cart],
+                total:  this.cartTotal,
+              };
+              this.cartOpen = false;
+              this.clearCart();
+              this.view = 'confirmation';
+            }
+          } catch (err) {
+            console.error('Order failed:', err);
+          } finally {
+            this.submitting = false;
+          }
+        },
+
+        newOrder() {
+          this.clearCart();
+          this.customerName  = '';
+          this.orderNotes    = '';
+          this.orderType     = 'dine-in';
+          this.confirmedOrder = null;
+          this.view          = 'menu';
+          window.scrollTo(0, 0);
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>

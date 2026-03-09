@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en" x-data="adminApp()">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hualien Kitchen &mdash; Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <style>[x-cloak] { display: none !important; }</style>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+
+  <!-- Mobile sidebar backdrop -->
+  <div class="sidebar-backdrop" x-cloak x-show="sidebarOpen" @click="sidebarOpen = false"></div>
+
+  <div class="admin-layout">
+
+    <!-- ══════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════ -->
+    <aside class="admin-sidebar" :class="{ open: sidebarOpen }">
+
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-name">Hualien Kitchen</span>
+        <span class="sidebar-admin-tag">Admin</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h18"/><path d="M3 12h18"/><path d="M3 22h18"/><path d="M9 7l3-5 3 5"/><path d="M9 17l3 5 3-5"/></svg>
+          Menu Items
+        </button>
+        <a class="nav-item" href="{{ url_for('admin.orders') }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Orders
+        </a>
+        <button class="nav-item" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Analytics
+          <span class="nav-soon">Soon</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a class="nav-item nav-back" href="{{ url_for('menu.index') }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Customer Menu
+        </a>
+        <a class="nav-item nav-back" href="{{ url_for('admin.logout') }}" style="opacity:0.7">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign Out
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ══════════════════════════════════════
+         MAIN
+    ══════════════════════════════════════ -->
+    <div class="admin-main">
+
+      <!-- Header -->
+      <header class="admin-header">
+        <div class="header-left">
+          <button class="burger" @click="sidebarOpen = !sidebarOpen" aria-label="Toggle sidebar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <h1 class="header-title">Menu Items</h1>
+        </div>
+        <button class="btn-primary" @click="openAddModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Dish
+        </button>
+      </header>
+
+      <main class="admin-content">
+
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <span class="stat-num" x-text="items.length"></span>
+            <span class="stat-label">Total Dishes</span>
+          </div>
+          <div class="stat-card green">
+            <span class="stat-num" x-text="availableCount"></span>
+            <span class="stat-label">Available</span>
+          </div>
+          <div class="stat-card amber">
+            <span class="stat-num" x-text="soldOutCount"></span>
+            <span class="stat-label">Sold Out</span>
+          </div>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="content-toolbar">
+          <div class="filter-tabs">
+            <button class="filter-btn" :class="{ active: activeCategory === 'all' }" @click="activeCategory = 'all'">All</button>
+            <template x-for="cat in categories" :key="cat.id">
+              <button class="filter-btn" :class="{ active: activeCategory === cat.id }" @click="activeCategory = cat.id" x-text="cat.label"></button>
+            </template>
+          </div>
+          <button class="btn-primary hide-mobile" @click="openAddModal()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Dish
+          </button>
+        </div>
+
+        <!-- Items list -->
+        <div class="items-list">
+          <div class="items-header">
+            <span>Dish</span>
+            <span>Category</span>
+            <span>Price</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
+
+          <template x-for="item in filteredItems" :key="item.id">
+            <div class="item-row" :class="{ unavailable: !item.available }">
+
+              <div class="item-names">
+                <span class="item-name-en" x-text="item.name"></span>
+                <span class="item-name-zh" x-text="item.nameZh"></span>
+              </div>
+
+              <span class="cat-badge" :class="item.category" x-text="categoryLabel(item.category)"></span>
+
+              <span class="item-price-col">NT$<span x-text="item.price"></span></span>
+
+              <!-- ★ Availability toggle — one tap, no page reload ★ -->
+              <button
+                class="avail-btn"
+                :class="item.available ? 'avail-on' : 'avail-off'"
+                @click="toggleAvailable(item)"
+                :title="item.available ? 'Mark as sold out' : 'Mark as available'">
+                <span class="avail-dot"></span>
+                <span x-text="item.available ? 'Available' : 'Sold Out'"></span>
+              </button>
+
+              <div class="item-actions">
+                <button class="icon-btn" @click="openEditModal(item)" title="Edit dish">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                </button>
+                <button class="icon-btn danger" @click="askDelete(item.id)" title="Delete dish">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                </button>
+              </div>
+
+            </div>
+          </template>
+
+          <div class="empty-state" x-show="filteredItems.length === 0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.3"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+            <p>No dishes in this category.</p>
+            <button class="btn-primary" @click="openAddModal()">Add a dish</button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       ADD / EDIT MODAL
+       Form POSTs to Flask — Alpine validates, then submits natively.
+  ══════════════════════════════════════ -->
+  <div class="modal-overlay" x-cloak x-show="modal.open" @click.self="modal.open = false">
+    <div class="modal">
+
+      <div class="modal-header">
+        <h2 x-text="modal.mode === 'add' ? 'Add New Dish' : 'Edit Dish'"></h2>
+        <button class="modal-close" @click="modal.open = false">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <form
+        x-ref="itemForm"
+        :action="modal.mode === 'add' ? '/admin/items/add' : '/admin/items/' + form.id + '/edit'"
+        method="POST"
+        @submit.prevent="validateAndSubmit($refs.itemForm)">
+
+        <div class="modal-body">
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="form-label">Name (English) <span class="required">*</span></label>
+              <input class="form-input" :class="{ 'has-error': formErrors.name }" type="text" name="name" x-model="form.name" placeholder="e.g. Braised Pork Rice" @input="formErrors.name = false">
+              <span class="form-error" x-show="formErrors.name">Required</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">&#21517;&#31281;&#xFF08;&#20013;&#25991;&#xFF09;</label>
+              <input class="form-input" type="text" name="name_zh" x-model="form.nameZh" placeholder="&#20363;&#65306;&#28579;&#32905;&#39292;">
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="form-label">Category <span class="required">*</span></label>
+              <select class="form-input form-select" name="category" x-model="form.category">
+                <option value="appetizers">Appetizers</option>
+                <option value="mains">Main Dishes</option>
+                <option value="soups">Soups</option>
+                <option value="drinks">Drinks</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Price (NT$) <span class="required">*</span></label>
+              <input class="form-input" :class="{ 'has-error': formErrors.price }" type="number" name="price" x-model="form.price" placeholder="120" min="1" @input="formErrors.price = false">
+              <span class="form-error" x-show="formErrors.price">Required, must be &gt; 0</span>
+            </div>
+          </div>
+
+          <div class="form-row two-col">
+            <div class="form-group">
+              <label class="form-label">Description (English)</label>
+              <textarea class="form-input form-textarea" name="desc" x-model="form.desc" placeholder="Short description&hellip;" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">&#35498;&#26126;&#xFF08;&#20013;&#25991;&#xFF09;</label>
+              <textarea class="form-input form-textarea" name="desc_zh" x-model="form.descZh" placeholder="&#31807;&#30701;&#25551;&#36848;&#8943;" rows="2"></textarea>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Status</label>
+              <div class="status-toggle">
+                <button type="button" class="status-btn" :class="{ active: form.available }" @click="form.available = true">Available</button>
+                <button type="button" class="status-btn" :class="{ active: !form.available }" @click="form.available = false">Sold Out</button>
+              </div>
+              <!-- Hidden input carries the boolean to Flask -->
+              <input type="hidden" name="available" :value="form.available ? 'true' : 'false'">
+            </div>
+          </div>
+
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-ghost" @click="modal.open = false">Cancel</button>
+          <button type="submit" class="btn-primary" x-text="modal.mode === 'add' ? 'Add Dish' : 'Save Changes'"></button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════
+       DELETE CONFIRM MODAL
+       Uses a hidden form submitted programmatically.
+  ══════════════════════════════════════ -->
+  <form x-ref="deleteForm" :action="'/admin/items/' + deleteConfirm.itemId + '/delete'" method="POST"></form>
+
+  <div class="modal-overlay" x-cloak x-show="deleteConfirm.open" @click.self="deleteConfirm.open = false">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>Delete Dish?</h2>
+      </div>
+      <div class="modal-body">
+        <p class="delete-msg">This will permanently remove the dish from the menu. This cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" @click="deleteConfirm.open = false">Cancel</button>
+        <button class="btn-danger" @click="$refs.deleteForm.submit()">Delete</button>
+      </div>
+    </div>
+  </div>
+
+
+  <script>
+    // Items injected by Flask — refreshed on every page load after CRUD operations
+    const ADMIN_ITEMS = {{ items | tojson }};
+
+    function adminApp() {
+      return {
+        sidebarOpen:    false,
+        activeCategory: 'all',
+
+        modal:      { open: false, mode: 'add' },
+        form:       { id: null, name: '', nameZh: '', category: 'mains', price: '', desc: '', descZh: '', available: true },
+        formErrors: { name: false, price: false },
+
+        deleteConfirm: { open: false, itemId: null },
+
+        // Initialised from server — refreshes automatically after every form POST redirect
+        items: ADMIN_ITEMS,
+
+        categories: [
+          { id: 'appetizers', label: 'Appetizers' },
+          { id: 'mains',      label: 'Main Dishes' },
+          { id: 'soups',      label: 'Soups'       },
+          { id: 'drinks',     label: 'Drinks'      },
+        ],
+
+        categoryLabels: { appetizers: 'Appetizers', mains: 'Main Dishes', soups: 'Soups', drinks: 'Drinks' },
+
+        get filteredItems() {
+          if (this.activeCategory === 'all') return this.items;
+          return this.items.filter(i => i.category === this.activeCategory);
+        },
+        get availableCount() { return this.items.filter(i => i.available).length; },
+        get soldOutCount()   { return this.items.filter(i => !i.available).length; },
+
+        categoryLabel(cat) { return this.categoryLabels[cat] || cat; },
+
+        // Availability toggle — fetch, no page reload
+        async toggleAvailable(item) {
+          try {
+            const res  = await fetch(`/admin/items/${item.id}/toggle`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) { item.available = data.available; }
+          } catch (err) {
+            console.error('Toggle failed:', err);
+          }
+        },
+
+        openAddModal() {
+          this.form       = { id: null, name: '', nameZh: '', category: 'mains', price: '', desc: '', descZh: '', available: true };
+          this.formErrors = { name: false, price: false };
+          this.modal      = { open: true, mode: 'add' };
+        },
+
+        openEditModal(item) {
+          this.form       = { ...item, price: String(item.price) };
+          this.formErrors = { name: false, price: false };
+          this.modal      = { open: true, mode: 'edit' };
+        },
+
+        // Validate then let the native form submit to Flask
+        validateAndSubmit(form) {
+          this.formErrors.name  = !this.form.name.trim();
+          this.formErrors.price = !this.form.price || Number(this.form.price) <= 0;
+          if (this.formErrors.name || this.formErrors.price) return;
+          form.submit();
+        },
+
+        askDelete(itemId) {
+          this.deleteConfirm = { open: true, itemId };
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>

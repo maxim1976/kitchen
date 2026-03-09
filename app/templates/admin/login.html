@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login &mdash; Hualien Kitchen</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 360px;
+    }
+    .login-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.75rem;
+    }
+    .login-brand { font-size: 1.1rem; font-weight: 700; color: var(--green); }
+    .login-tag   { font-size: 0.7rem; font-weight: 700; background: var(--green); color: #fff; padding: 0.15rem 0.45rem; border-radius: 999px; }
+    .login-title { font-size: 1.3rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
+    .login-sub   { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.5rem; }
+    .login-error { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.85rem; color: #b91c1c; margin-bottom: 1rem; }
+    .login-group { margin-bottom: 1rem; }
+    .login-group label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+    .login-btn { width: 100%; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <div class="login-logo">
+      <span class="login-brand">Hualien Kitchen</span>
+      <span class="login-tag">Admin</span>
+    </div>
+
+    <h1 class="login-title">Sign in</h1>
+    <p class="login-sub">Owner access only.</p>
+
+    {% if error %}
+      <div class="login-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('admin.login') }}">
+      <div class="login-group">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          class="form-input"
+          type="text"
+          name="username"
+          autocomplete="username"
+          required
+          autofocus>
+      </div>
+      <div class="login-group">
+        <label for="password">Password</label>
+        <input
+          id="password"
+          class="form-input"
+          type="password"
+          name="password"
+          autocomplete="current-password"
+          required>
+      </div>
+      <button type="submit" class="btn-primary login-btn">Sign In</button>
+    </form>
+  </div>
+
+</body>
+</html>

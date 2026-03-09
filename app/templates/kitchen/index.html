@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kitchen Display — Hualien Kitchen</title>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d0d;
+      --surface:   #1a1a1a;
+      --border:    #2a2a2a;
+      --text:      #f0f0f0;
+      --muted:     #777;
+      --green:     #2a5c45;
+      --green-lt:  #3a9967;
+      --gold:      #c8a057;
+      --sans:      -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    html, body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    .kd-header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #111;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.7rem 1.25rem;
+      gap: 1rem;
+    }
+    .kd-brand {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+    .kd-clock {
+      font-size: 1.5rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+    .kd-header-right { text-align: right; }
+    .kd-counts { display: flex; gap: 1rem; justify-content: flex-end; }
+    .kd-count {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .kd-count-dot { width: 7px; height: 7px; border-radius: 50%; }
+    .kd-count-dot.green { background: var(--green-lt); }
+    .kd-count-dot.gold  { background: var(--gold); }
+    .kd-meta { font-size: 0.7rem; color: var(--muted); margin-top: 0.15rem; }
+
+    /* ── Live pulse dot ───────────────────────────────────────── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
+    }
+    .live-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: #4caf7a;
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+
+    /* ── Main grid ────────────────────────────────────────────── */
+    .kd-main {
+      padding: 1.25rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 680px) {
+      .kd-main { grid-template-columns: 1fr; }
+    }
+
+    /* ── Section header ───────────────────────────────────────── */
+    .kd-section-title {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .kd-section-title.green { color: var(--green-lt); }
+    .kd-section-title.gold  { color: var(--gold); }
+    .kd-section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ── Empty state ──────────────────────────────────────────── */
+    .kd-empty {
+      border: 1px dashed var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* ── Cards ────────────────────────────────────────────────── */
+    .kd-cards { display: flex; flex-direction: column; gap: 0.85rem; }
+
+    @keyframes card-in {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .kd-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      animation: card-in 0.22s ease both;
+    }
+    .kd-card.pending { border-left: 4px solid var(--green-lt); }
+    .kd-card.ready   { border-left: 4px solid var(--gold); }
+
+    .kd-card-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      padding: 0.8rem 1rem 0.4rem;
+      gap: 0.5rem;
+    }
+    .kd-order-num {
+      font-size: 1.9rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
+      line-height: 1;
+    }
+    .kd-card.pending .kd-order-num { color: var(--text); }
+    .kd-card.ready   .kd-order-num { color: var(--gold); }
+
+    .kd-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; }
+    .kd-badge {
+      font-size: 0.62rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.18rem 0.5rem;
+      border-radius: 4px;
+    }
+    .kd-badge.dine-in { background: rgba(58,153,103,0.2); color: #5fcca0; }
+    .kd-badge.takeout { background: rgba(200,160,87,0.18); color: var(--gold); }
+    .kd-badge.elapsed { background: var(--border); color: var(--muted); }
+    .kd-badge.table   { background: rgba(58,153,103,0.12); color: #5fcca0; font-size: 0.75rem; }
+
+    .kd-customer {
+      padding: 0 1rem 0.65rem;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .kd-items {
+      padding: 0 1rem 0.75rem;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+    .kd-item {
+      display: flex;
+      align-items: baseline;
+      font-size: 0.9rem;
+    }
+    .kd-item-qty {
+      font-weight: 700;
+      color: var(--gold);
+      min-width: 2.5ch;
+      margin-right: 0.4rem;
+      flex-shrink: 0;
+    }
+
+    .kd-notes {
+      margin: 0 1rem 0.75rem;
+      padding: 0.45rem 0.7rem;
+      background: rgba(200,160,87,0.07);
+      border-left: 2px solid rgba(200,160,87,0.4);
+      border-radius: 0 4px 4px 0;
+      font-size: 0.8rem;
+      color: #c9a96e;
+      font-style: italic;
+    }
+
+    .kd-card-foot {
+      border-top: 1px solid var(--border);
+      padding: 0.6rem 1rem;
+    }
+    .kd-btn {
+      width: 100%;
+      padding: 0.65rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .kd-btn:active { transform: scale(0.97); }
+    .kd-btn.ready-btn  { background: var(--green); color: #fff; }
+    .kd-btn.ready-btn:hover  { background: var(--green-lt); }
+    .kd-btn.served-btn { background: rgba(200,160,87,0.12); color: var(--gold); border: 1px solid rgba(200,160,87,0.3); }
+    .kd-btn.served-btn:hover { background: rgba(200,160,87,0.22); }
+  </style>
+</head>
+<body x-data="kitchen()">
+
+  <header class="kd-header">
+    <div class="kd-brand">
+      <span class="live-dot"></span>Kitchen Display
+    </div>
+    <div class="kd-clock" x-text="currentTime()"></div>
+    <div class="kd-header-right">
+      <div class="kd-counts">
+        <div class="kd-count">
+          <span class="kd-count-dot green"></span>
+          <span x-text="pending.length + ' pending'"></span>
+        </div>
+        <div class="kd-count">
+          <span class="kd-count-dot gold"></span>
+          <span x-text="ready.length + ' ready'"></span>
+        </div>
+      </div>
+      <div class="kd-meta" x-text="lastUpdated ? 'Updated ' + lastUpdated.toLocaleTimeString() : 'Loading…'"></div>
+    </div>
+  </header>
+
+  <main class="kd-main">
+
+    <!-- ── Pending ───────────────────────────────────────────── -->
+    <div>
+      <div class="kd-section-title green">In Progress</div>
+      <div class="kd-cards">
+        <template x-if="pending.length === 0">
+          <div class="kd-empty">No pending orders</div>
+        </template>
+        <template x-for="order in pending" :key="order.id">
+          <div class="kd-card pending">
+            <div class="kd-card-head">
+              <div class="kd-order-num" x-text="'#' + order.orderNumber"></div>
+              <div class="kd-badges">
+                <span
+                  class="kd-badge"
+                  :class="order.orderType"
+                  x-text="order.orderType === 'dine-in' ? 'Dine-in' : 'Takeout'">
+                </span>
+                <span class="kd-badge elapsed" x-text="elapsed(order.createdAt)"></span>
+                <span class="kd-badge table" x-show="order.tableNumber" x-text="'T-' + order.tableNumber"></span>
+              </div>
+            </div>
+            <div class="kd-customer" x-text="order.customerName"></div>
+            <ul class="kd-items">
+              <template x-for="item in order.items" :key="item.name + item.quantity">
+                <li class="kd-item">
+                  <span class="kd-item-qty" x-text="'×' + item.quantity"></span>
+                  <span x-text="item.name"></span>
+                </li>
+              </template>
+            </ul>
+            <template x-if="order.notes">
+              <div class="kd-notes" x-text="order.notes"></div>
+            </template>
+            <div class="kd-card-foot">
+              <button class="kd-btn ready-btn" @click="markReady(order.id)">Mark Ready</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- ── Ready ─────────────────────────────────────────────── -->
+    <div>
+      <div class="kd-section-title gold">Ready for Pickup</div>
+      <div class="kd-cards">
+        <template x-if="ready.length === 0">
+          <div class="kd-empty">No orders ready</div>
+        </template>
+        <template x-for="order in ready" :key="order.id">
+          <div class="kd-card ready">
+            <div class="kd-card-head">
+              <div class="kd-order-num" x-text="'#' + order.orderNumber"></div>
+              <div class="kd-badges">
+                <span
+                  class="kd-badge"
+                  :class="order.orderType"
+                  x-text="order.orderType === 'dine-in' ? 'Dine-in' : 'Takeout'">
+                </span>
+                <span class="kd-badge elapsed" x-text="elapsed(order.createdAt)"></span>
+                <span class="kd-badge table" x-show="order.tableNumber" x-text="'T-' + order.tableNumber"></span>
+              </div>
+            </div>
+            <div class="kd-customer" x-text="order.customerName"></div>
+            <ul class="kd-items">
+              <template x-for="item in order.items" :key="item.name + item.quantity">
+                <li class="kd-item">
+                  <span class="kd-item-qty" x-text="'×' + item.quantity"></span>
+                  <span x-text="item.name"></span>
+                </li>
+              </template>
+            </ul>
+            <template x-if="order.notes">
+              <div class="kd-notes" x-text="order.notes"></div>
+            </template>
+            <div class="kd-card-foot">
+              <button class="kd-btn served-btn" @click="markDone(order.id)">Served ✓</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    function kitchen() {
+      return {
+        pending: [],
+        ready: [],
+        lastUpdated: null,
+        ticker: 0,
+
+        async init() {
+          await this.refresh();
+          setInterval(() => this.refresh(), 8000);
+          setInterval(() => this.ticker++, 1000);
+        },
+
+        async refresh() {
+          try {
+            const r = await fetch('/kitchen/orders');
+            const orders = await r.json();
+            this.pending = orders.filter(o => o.status === 'pending');
+            this.ready   = orders.filter(o => o.status === 'ready');
+            this.lastUpdated = new Date();
+          } catch (e) {
+            console.error('Kitchen refresh failed', e);
+          }
+        },
+
+        async markReady(id) {
+          await fetch(`/kitchen/orders/${id}/ready`, { method: 'POST' });
+          await this.refresh();
+        },
+
+        async markDone(id) {
+          await fetch(`/kitchen/orders/${id}/done`, { method: 'POST' });
+          await this.refresh();
+        },
+
+        elapsed(isoStr) {
+          void this.ticker;
+          const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+          if (diff < 60) return `${diff}s`;
+          const m = Math.floor(diff / 60);
+          if (m < 60) return `${m} min`;
+          return `${Math.floor(m / 60)}h ${m % 60}m`;
+        },
+
+        currentTime() {
+          void this.ticker;
+          return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>

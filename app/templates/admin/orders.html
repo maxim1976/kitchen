@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en" x-data="ordersApp()">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orders &mdash; Hualien Kitchen Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+  <style>
+    [x-cloak] { display: none !important; }
+
+    /* ── Period filter tabs ──────────────────────────────────── */
+    .period-tabs { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+    .period-btn {
+      padding: 0.35rem 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .period-btn:hover  { background: var(--green-pale); color: var(--green); border-color: var(--green); }
+    .period-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
+
+    /* ── Orders table ────────────────────────────────────────── */
+    .orders-list {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .orders-header {
+      display: grid;
+      grid-template-columns: 4.5rem 4rem 1fr 6rem 1fr 5.5rem 7rem;
+      padding: 0.6rem 1.1rem;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg);
+    }
+    @media (max-width: 820px) {
+      .orders-header { display: none; }
+    }
+
+    .order-row {
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .order-row:last-child { border-bottom: none; }
+    .order-row:hover { background: var(--green-pale); }
+
+    .order-row-main {
+      display: grid;
+      grid-template-columns: 4.5rem 4rem 1fr 6rem 1fr 5.5rem 7rem;
+      align-items: center;
+      padding: 0.75rem 1.1rem;
+      gap: 0.5rem;
+    }
+    @media (max-width: 820px) {
+      .order-row-main {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto auto auto;
+      }
+    }
+
+    .order-num  { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 0.95rem; color: var(--text); }
+    .order-time { font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .order-customer { font-size: 0.9rem; font-weight: 600; }
+    .order-items-preview { font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .order-total { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+
+    /* Type badge */
+    .type-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+    }
+    .type-badge.dine-in  { background: var(--green-pale); color: var(--green); }
+    .type-badge.takeout  { background: #fef9ee; color: #9a6c00; }
+
+    /* Status badge — clickable */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      padding: 0.25rem 0.65rem;
+      border-radius: 999px;
+      border: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .status-badge:active { transform: scale(0.95); }
+    .status-badge::before {
+      content: '';
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-badge.pending { background: #fef3e2; color: #9a5d00; }
+    .status-badge.pending::before { background: #f59e0b; }
+    .status-badge.ready   { background: #e8f4fd; color: #1565c0; }
+    .status-badge.ready::before   { background: #2196f3; }
+    .status-badge.done    { background: var(--green-pale); color: var(--green); }
+    .status-badge.done::before    { background: var(--green); }
+
+    /* Expand chevron */
+    .expand-chevron {
+      display: inline-block;
+      margin-left: 0.3rem;
+      transition: transform 0.2s;
+      color: var(--muted);
+      font-size: 0.7rem;
+    }
+    .order-row.expanded .expand-chevron { transform: rotate(180deg); }
+
+    /* Expanded detail panel */
+    .order-detail {
+      border-top: 1px dashed var(--border);
+      padding: 0.85rem 1.1rem 1rem;
+      background: var(--bg);
+    }
+    .order-detail-items {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      margin-bottom: 0.6rem;
+    }
+    .order-detail-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+    }
+    .order-detail-item-left { display: flex; gap: 0.5rem; }
+    .order-detail-qty { font-weight: 700; color: var(--gold); min-width: 2ch; }
+    .order-detail-subtotal { color: var(--muted); }
+    .order-detail-notes {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+      font-style: italic;
+      padding: 0.35rem 0.6rem;
+      background: #fffbf0;
+      border-left: 2px solid var(--gold);
+      border-radius: 0 4px 4px 0;
+    }
+    .order-detail-total {
+      text-align: right;
+      font-size: 0.9rem;
+      font-weight: 700;
+      padding-top: 0.5rem;
+      border-top: 1px solid var(--border);
+      margin-top: 0.5rem;
+    }
+
+    /* Empty state */
+    .orders-empty {
+      padding: 3rem;
+      text-align: center;
+      color: var(--muted);
+    }
+    .orders-empty svg { opacity: 0.25; margin-bottom: 0.75rem; }
+    .orders-empty p { font-size: 0.9rem; }
+  </style>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body>
+
+  <div class="sidebar-backdrop" x-cloak x-show="sidebarOpen" @click="sidebarOpen = false"></div>
+
+  <div class="admin-layout">
+
+    <!-- ══════════════════════════════════════
+         SIDEBAR
+    ══════════════════════════════════════ -->
+    <aside class="admin-sidebar" :class="{ open: sidebarOpen }">
+
+      <div class="sidebar-brand">
+        <span class="sidebar-brand-name">Hualien Kitchen</span>
+        <span class="sidebar-admin-tag">Admin</span>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a class="nav-item" href="{{ url_for('admin.dashboard') }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2h18"/><path d="M3 12h18"/><path d="M3 22h18"/><path d="M9 7l3-5 3 5"/><path d="M9 17l3 5 3-5"/></svg>
+          Menu Items
+        </a>
+        <a class="nav-item active" href="{{ url_for('admin.orders') }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Orders
+        </a>
+        <button class="nav-item" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          Analytics
+          <span class="nav-soon">Soon</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a class="nav-item nav-back" href="{{ url_for('menu.index') }}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Customer Menu
+        </a>
+        <a class="nav-item nav-back" href="{{ url_for('admin.logout') }}" style="opacity:0.7">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign Out
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ══════════════════════════════════════
+         MAIN
+    ══════════════════════════════════════ -->
+    <div class="admin-main">
+
+      <header class="admin-header">
+        <div class="header-left">
+          <button class="burger" @click="sidebarOpen = !sidebarOpen" aria-label="Toggle sidebar">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <h1 class="header-title">Orders &mdash; {{ period_label }}</h1>
+        </div>
+      </header>
+
+      <main class="admin-content">
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <span class="stat-num">{{ order_count }}</span>
+            <span class="stat-label">Orders</span>
+          </div>
+          <div class="stat-card green">
+            <span class="stat-num">NT${{ "%.0f"|format(total_revenue) }}</span>
+            <span class="stat-label">Revenue</span>
+          </div>
+          <div class="stat-card amber">
+            <span class="stat-num">{{ pending_count }}</span>
+            <span class="stat-label">Pending</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num">{{ done_count }}</span>
+            <span class="stat-label">Done</span>
+          </div>
+        </div>
+
+        <!-- Period filter -->
+        <div class="content-toolbar">
+          <div class="period-tabs">
+            <a class="period-btn {% if period == 'today' %}active{% endif %}"
+               href="{{ url_for('admin.orders', period='today') }}">Today</a>
+            <a class="period-btn {% if period == 'yesterday' %}active{% endif %}"
+               href="{{ url_for('admin.orders', period='yesterday') }}">Yesterday</a>
+            <a class="period-btn {% if period == 'week' %}active{% endif %}"
+               href="{{ url_for('admin.orders', period='week') }}">Last 7 Days</a>
+            <a class="period-btn {% if period == 'all' %}active{% endif %}"
+               href="{{ url_for('admin.orders', period='all') }}">All Time</a>
+          </div>
+        </div>
+
+        <!-- Orders list -->
+        <div class="orders-list">
+
+          {% if orders %}
+
+            <div class="orders-header">
+              <span>#</span>
+              <span>Time</span>
+              <span>Customer</span>
+              <span>Type</span>
+              <span>Items</span>
+              <span>Total</span>
+              <span>Status</span>
+            </div>
+
+            <template x-for="order in orders" :key="order.id">
+              <div class="order-row" :class="{ expanded: expandedId === order.id }">
+
+                <div class="order-row-main" @click="toggle(order.id)">
+                  <span class="order-num" x-text="'#' + order.orderNumber"></span>
+                  <span class="order-time" x-text="order.time"></span>
+                  <span class="order-customer" x-text="order.customerName"></span>
+                  <span class="type-badge" :class="order.orderType" x-text="order.orderType === 'dine-in' ? 'Dine-in' : 'Takeout'"></span>
+                  <span class="order-items-preview" x-text="itemsSummary(order.items)"></span>
+                  <span class="order-total" x-text="'NT$' + order.total.toFixed(0)"></span>
+                  <button
+                    class="status-badge"
+                    :class="order.status"
+                    @click.stop="cycleStatus(order)"
+                    :title="'Click to advance status'"
+                    x-text="{ pending: 'Pending', ready: 'Ready', done: 'Done' }[order.status]">
+                  </button>
+                </div>
+
+                <div class="order-detail" x-show="expandedId === order.id" x-cloak>
+                  <ul class="order-detail-items">
+                    <template x-for="item in order.items" :key="item.name">
+                      <li class="order-detail-item">
+                        <div class="order-detail-item-left">
+                          <span class="order-detail-qty" x-text="'×' + item.qty"></span>
+                          <span x-text="item.name"></span>
+                        </div>
+                        <span class="order-detail-subtotal" x-text="'NT$' + (item.price * item.qty).toFixed(0)"></span>
+                      </li>
+                    </template>
+                  </ul>
+                  <template x-if="order.tableNumber">
+                    <div class="order-detail-notes" style="border-color:var(--green);background:var(--green-pale);font-style:normal;">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+                      <span x-text="'Table ' + order.tableNumber" style="color:var(--green);font-weight:700;"></span>
+                    </div>
+                  </template>
+                  <template x-if="order.notes">
+                    <div class="order-detail-notes">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <span x-text="order.notes"></span>
+                    </div>
+                  </template>
+                  <div class="order-detail-total" x-text="'Total: NT$' + order.total.toFixed(0)"></div>
+                </div>
+
+              </div>
+            </template>
+
+          {% else %}
+
+            <div class="orders-empty">
+              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <p>No orders for this period.</p>
+            </div>
+
+          {% endif %}
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const ORDERS_DATA = {{ orders | tojson }};
+
+    function ordersApp() {
+      return {
+        sidebarOpen: false,
+        orders: ORDERS_DATA,
+        expandedId: null,
+
+        toggle(id) {
+          this.expandedId = this.expandedId === id ? null : id;
+        },
+
+        itemsSummary(items) {
+          if (!items.length) return '—';
+          const first = items[0];
+          const rest  = items.length - 1;
+          let s = `×${first.qty} ${first.name}`;
+          if (rest > 0) s += ` +${rest} more`;
+          return s;
+        },
+
+        async cycleStatus(order) {
+          const next = { pending: 'ready', ready: 'done', done: 'pending' };
+          const newStatus = next[order.status] || 'pending';
+          try {
+            const res  = await fetch(`/admin/orders/${order.id}/status`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status: newStatus }),
+            });
+            const data = await res.json();
+            if (data.success) order.status = data.status;
+          } catch (e) {
+            console.error('Status update failed', e);
+          }
+        },
+      };
+    }
+  </script>
+
+</body>
+</html>
