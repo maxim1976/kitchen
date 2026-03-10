@@ -21,4 +21,7 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/admin')
     app.register_blueprint(kitchen_bp, url_prefix='/kitchen')
 
+    from app.seed import register_seed_command
+    register_seed_command(app)
+
     return app
